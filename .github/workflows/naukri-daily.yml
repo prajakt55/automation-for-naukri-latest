@@ -1,0 +1,31 @@
+name: Daily Naukri Profile Update
+
+on:
+  schedule:
+    # Runs every day at 9:00 AM IST (3:30 AM UTC)
+    - cron: '30 3 * * *'
+  workflow_dispatch: # Lets you trigger it manually from GitHub anytime
+
+jobs:
+  update-naukri:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Naukri Update Script
+        env:
+          CI: true
+        run: npx tsx tests/naukri-update.ts
