@@ -47,16 +47,15 @@ async function updateNaukriDescription() {
     console.log('Navigating to profile page...');
     await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
     
-    // Wait for network requests to settle so dynamic elements load properly in headless mode
+    // Wait for network requests to settle so the profile widgets load
     await page.waitForLoadState('networkidle');
     console.log('Successfully reached the profile page!');
 
-    // Explicitly wait for the resume headline container to become visible before scrolling
-    const targetScroll = page.locator('#lazyResumeHead');
-    await targetScroll.waitFor({ state: 'visible', timeout: 20000 });
-    await targetScroll.scrollIntoViewIfNeeded();
-
+    // Directly target the Resume Headline edit button
     const editButton = page.locator('div.widgetHead').filter({ hasText: 'Resume headline' }).locator('span[role="button"]');
+    
+    await editButton.scrollIntoViewIfNeeded();
+    await editButton.waitFor({ state: 'visible', timeout: 20000 });
     await editButton.click();
 
     const desciptionStoring = page.locator('textarea#resumeHeadline');
