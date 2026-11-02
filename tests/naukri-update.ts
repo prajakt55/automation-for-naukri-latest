@@ -2,13 +2,12 @@ import { chromium } from 'playwright';
 
 async function updateNaukriDescription() {
   const userDataDir = './user_data';
-  const isCI = !!process.env.CI; // Automatically detects if running on GitHub Actions
+  const isCI = !!process.env.CI;
 
   console.log('Launching browser with anti-detection flags...');
   const browser = await chromium.launchPersistentContext(userDataDir, {
-    // Use system chrome locally, built-in chromium on GitHub Actions Linux
     ...(isCI ? {} : { channel: 'chrome' }),
-    headless: isCI, // false locally, true on GitHub Actions
+    headless: isCI,
     slowMo: 50,
     ignoreDefaultArgs: ['--enable-automation'],
     args: [
@@ -24,45 +23,57 @@ async function updateNaukriDescription() {
     page = browser.pages().length > 0 ? browser.pages()[0] : await browser.newPage();
   }
 
-  // Hide webdriver flag from bot detection
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
 
   try {
-    console.log('Navigating to Naukri homepage...');
-    await page.goto('https://www.naukri.com', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000); // Allow security check cookies to pass
+    console.log('Navigating to Naukri profile...');
+    // Direct navigation to the core profile page container
+    await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
+    
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(4000);
 
     if (page.url().includes('nlogin') || page.url().includes('login')) {
       if (isCI) {
         throw new Error('Login required on CI, but no saved session found in user_data!');
       }
-      console.log('--- ACTION REQUIRED ---');
-      console.log('Please log in manually in the opened browser window.');
+      console.log('Please log in manually...');
       await page.waitForURL('**/mnjuser/**', { timeout: 120000 });
-      console.log('Login successful! Session cookies saved.');
     }
 
-    console.log('Navigating to profile page...');
-    await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
+    console.log('Locating Resume Headline container...');
     
-    // Wait for network requests and give dynamic widgets time to render on CI
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(5000); 
-    console.log('Successfully reached the profile page!');
+    // Fallback strategy: Try clicking the edit icon using multiple broad selectors or JS click execution
+    const editIconFound = await page.evaluate(() => {
+      const spans = Array.from(document.querySelectorAll('span, div, a'));
+      const target = spans.find(el => el.textContent && el.textContent.toLowerCase().includes('resume headline'));
+      if (target) {
+        // Look for an edit sibling or parent action button
+        const card = target.closest('.card') || target.parentElement?.parentElement;
+        const editBtn = card?.querySelector('.edit-icon, [class*="edit"], [icon="edit"], span[role="button"]');
+        if (editBtn) {
+          (editBtn as HTMLElement).click();
+          return true;
+        }
+      }
+      return false;
+    });
 
-    // Find the profile card containing "Resume headline" and locate its edit button
-    const headlineCard = page.locator('div, section').filter({ hasText: /resume headline/i }).last();
-    const editButton = headlineCard.locator('span.edit-icon, [class*="edit"], span[role="button"], em.icon.edit');
-    
-    await editButton.first().waitFor({ state: 'visible', timeout: 30000 });
-    await editButton.first().scrollIntoViewIfNeeded();
-    await editButton.first().click();
+    if (!editIconFound) {
+      // Direct fallback: try pressing the textarea or anchor if already visible, or click by standard text selector
+      console.log('Attempting secondary fallback selector click...');
+      await page.locator('.edit-icon').first().click({ timeout: 5000 }).catch(() => {
+        console.log('Proceeding to look for textarea directly...');
+      });
+    }
 
+    // Wait for the headline text area to open
     const desciptionStoring = page.locator('textarea#resumeHeadline');
-    let getDesctiptionData = await desciptionStoring.inputValue();
+    await desciptionStoring.waitFor({ state: 'visible', timeout: 15000 });
 
+    let getDesctiptionData = await desciptionStoring.inputValue();
     const newHeadline = 'SDET / QA Automation Engineer | 4+ Yrs | Playwright, Selenium (Java), REST Assured, TestNG, Maven | API + UI Automation | CI/CD: Jenkins, GitHub Actions | Test Automation Expert | Immediate Joiner';
 
     if (getDesctiptionData.length > 0 && getDesctiptionData.endsWith('.')) {
