@@ -47,13 +47,13 @@ async function updateNaukriDescription() {
     console.log('Navigating to profile page...');
     await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
     
-    // Wait for network requests and give dynamic widgets extra time to render on CI
+    // Wait for network requests and give dynamic widgets time to render on CI
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000); 
     console.log('Successfully reached the profile page!');
 
-    // Resilient selector using case-insensitive text matching for "Resume Headline"
-    const editButton = page.locator('div.widgetHead').filter({ hasText: /resume headline/i }).locator('span[role="button"], span.edit-icon, [class*="edit"]');
+    // Target the Resume Headline edit icon directly via its container structure
+    const editButton = page.locator('#lazyResumeHead span.edit-icon, #lazyResumeHead [class*="edit"], div[id*="ResumeHead"] span[role="button"]');
     
     await editButton.first().waitFor({ state: 'visible', timeout: 30000 });
     await editButton.first().scrollIntoViewIfNeeded();
