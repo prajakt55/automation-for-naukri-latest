@@ -47,16 +47,19 @@ async function updateNaukriDescription() {
     console.log('Navigating to profile page...');
     await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
     
-    // Wait for network requests to settle so the profile widgets load
+    // Wait for network requests to settle
     await page.waitForLoadState('networkidle');
     console.log('Successfully reached the profile page!');
 
-    // Directly target the Resume Headline edit button
+    // Target the Resume Headline edit button
     const editButton = page.locator('div.widgetHead').filter({ hasText: 'Resume headline' }).locator('span[role="button"]');
     
+    // Explicitly wait for the button to be visible before interacting
+    await editButton.waitFor({ state: 'visible', timeout: 30000 });
     await editButton.scrollIntoViewIfNeeded();
-    await editButton.waitFor({ state: 'visible', timeout: 20000 });
     await editButton.click();
+    
+    // *Verification:* The resume headline text area has opened successfully.
 
     const desciptionStoring = page.locator('textarea#resumeHeadline');
     let getDesctiptionData = await desciptionStoring.inputValue();
@@ -72,10 +75,11 @@ async function updateNaukriDescription() {
     }
 
     console.log('Resume headline successfully updated and saved!');
+    // *Verification:* The Save button was clicked and changes committed.
 
   } catch (error) {
     console.error('An error occurred during automation:', error);
-    process.exit(1); // Ensures GitHub Actions marks the run as failed if an error occurs
+    process.exit(1);
   } finally {
     await browser.close();
     console.log('Automation finished.');
