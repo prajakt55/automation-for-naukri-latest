@@ -52,8 +52,9 @@ async function updateNaukriDescription() {
     await page.waitForTimeout(5000); 
     console.log('Successfully reached the profile page!');
 
-    // Target the Resume Headline edit icon directly via its container structure
-    const editButton = page.locator('#lazyResumeHead span.edit-icon, #lazyResumeHead [class*="edit"], div[id*="ResumeHead"] span[role="button"]');
+    // Find the profile card containing "Resume headline" and locate its edit button
+    const headlineCard = page.locator('div, section').filter({ hasText: /resume headline/i }).last();
+    const editButton = headlineCard.locator('span.edit-icon, [class*="edit"], span[role="button"], em.icon.edit');
     
     await editButton.first().waitFor({ state: 'visible', timeout: 30000 });
     await editButton.first().scrollIntoViewIfNeeded();
