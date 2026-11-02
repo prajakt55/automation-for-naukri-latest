@@ -46,10 +46,14 @@ async function updateNaukriDescription() {
 
     console.log('Navigating to profile page...');
     await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
+    
+    // Wait for network requests to settle so dynamic elements load properly in headless mode
+    await page.waitForLoadState('networkidle');
     console.log('Successfully reached the profile page!');
 
-    // FIXED: Added 'await' so the script actually waits for the scroll to finish
+    // Explicitly wait for the resume headline container to become visible before scrolling
     const targetScroll = page.locator('#lazyResumeHead');
+    await targetScroll.waitFor({ state: 'visible', timeout: 20000 });
     await targetScroll.scrollIntoViewIfNeeded();
 
     const editButton = page.locator('div.widgetHead').filter({ hasText: 'Resume headline' }).locator('span[role="button"]');
@@ -72,7 +76,7 @@ async function updateNaukriDescription() {
 
   } catch (error) {
     console.error('An error occurred during automation:', error);
-    process.exit(1); // Ensures GitHub Actions marks the build as failed if something breaks
+    process.exit(1); // Ensures GitHub Actions marks the run as failed if an error occurs
   } finally {
     await browser.close();
     console.log('Automation finished.');
