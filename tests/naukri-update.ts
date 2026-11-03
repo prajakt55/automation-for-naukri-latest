@@ -32,41 +32,50 @@ async function updateNaukriDescription() {
     await page.goto('https://www.naukri.com/mnjuser/profile?id=&altresid', { waitUntil: 'domcontentloaded' });
     
     await page.waitForLoadState('networkidle');
-    console.log('Successfully reached the profile page!');
+    console.log('Current Page Title:', await page.title());
+    console.log('Current URL:', page.url());
 
-    if (page.url().includes('nlogin') || page.url().includes('login')) {
-      if (isCI) {
-        throw new Error('Login required on CI, but no saved session found in user_data!');
-      }
-      console.log('Please log in manually...');
-      await page.waitForURL('**/mnjuser/**', { timeout: 120000 });
+    if (page.url().includes('nlogin') || page.url().includes('login') || page.url().includes('signup')) {
+      throw new Error('Redirected to login/signup page on CI! Session cookies in user_data may have expired or were blocked.');
     }
 
     console.log('Scrolling down to trigger lazy-loaded profile widgets...');
-    // Scroll down incrementally to force Naukri to render lazy widgets like resume headline
-    for (let i = 0; i < 3; i++) {
-      await page.evaluate(() => window.scrollBy(0, 500));
-      await page.waitForTimeout(1000);
+    for (let i = 0; i < 4; i++) {
+      await page.evaluate(() => window.scrollBy(0, 600));
+      await page.waitForTimeout(1500);
     }
 
-    console.log('Locating Resume Headline widget and edit button...');
+    console.log('Polling DOM for Resume Headline edit button...');
     
-    // Direct robust selector for the edit button using the exact attributes from your HTML snippet
-    const editButton = page.locator('span.edit.icon[aria-label="Edit resume headline"], [aria-label="Edit resume headline"]').first();
-    
-    await editButton.waitFor({ state: 'visible', timeout: 35000 });
-    await editButton.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1000);
+    // Use a robust JavaScript polling evaluation to find and click the exact aria-label element
+    const clicked = await page.evaluate(async () => {
+      const findAndClick = () => {
+        const btn = document.querySelector('[aria-label="Edit resume headline"]');
+        if (btn) {
+          (btn as HTMLElement).click();
+          return true;
+        }
+        return false;
+      };
 
-    try {
-      await editButton.click({ force: true });
-    } catch (clickErr) {
-      console.log('Standard click failed, attempting dispatchEvent click...');
-      await editButton.dispatchEvent('click');
+      if (findAndClick()) return true;
+
+      // If not found immediately, wait up to 10 seconds via polling
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise(r => setTimeout(r, 1000));
+        if (findAndClick()) return true;
+      }
+      return false;
+    });
+
+    if (!clicked) {
+      // Take a diagnostic screenshot before throwing
+      await page.screenshot({ path: 'ci-failure-debug.png', fullPage: true });
+      throw new Error('Could not find the "Edit resume headline" element in the DOM on CI. Check ci-failure-debug.png artifact.');
     }
-    
-    console.log('Edit button interaction complete. Waiting for textarea...');
-    await page.waitForTimeout(2000);
+
+    console.log('Edit button clicked successfully! Waiting for textarea...');
+    await page.waitForTimeout(3000);
 
     const descriptionStoring = page.locator('textarea#resumeHeadline');
     await descriptionStoring.waitFor({ state: 'visible', timeout: 20000 });
@@ -89,6 +98,10 @@ async function updateNaukriDescription() {
 
   } catch (error) {
     console.error('An error occurred during automation:', error);
+    try {
+      await page.screenshot({ path: 'ci-failure-debug.png', fullPage: true });
+      console.log('Saved ci-failure-debug.png screenshot for inspection.');
+    } catch (e) {}
     process.exit(1);
   } finally {
     await browser.close();
