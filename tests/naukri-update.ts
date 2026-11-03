@@ -42,19 +42,29 @@ async function updateNaukriDescription() {
       await page.waitForURL('**/mnjuser/**', { timeout: 120000 });
     }
 
-    console.log('Locating Resume Headline edit button...');
+    console.log('Locating Resume Headline widget and edit button...');
     
-    // Exact match for your HTML: <span class="edit icon" role="button" tabindex="0" aria-label="Edit resume headline">
-    const editButton = page.locator('span.edit.icon[aria-label="Edit resume headline"]');
+    // 1. Target the parent widget head container first to ensure stability
+    const widgetHead = page.locator('.widgetHead', { hasText: 'Resume headline' });
+    await widgetHead.waitFor({ state: 'visible', timeout: 30000 });
+    await widgetHead.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1000); // Brief pause for paint settlement
+
+    // 2. Locate the specific edit button inside or near the headline widget
+    const editButton = widgetHead.locator('span.edit.icon, [aria-label="Edit resume headline"]').first();
     
-    await editButton.waitFor({ state: 'visible', timeout: 30000 });
-    await editButton.scrollIntoViewIfNeeded();
+    await editButton.waitFor({ state: 'visible', timeout: 15000 });
     
-    // Using force: true ensures clicks aren't blocked by transparent overlays or layout quirks in CI
-    await editButton.click({ force: true });
+    // 3. Force click with coordinate fallback to bypass any overlay masks
+    try {
+      await editButton.click({ force: true });
+    } catch (clickErr) {
+      console.log('Standard click failed, attempting dispatchEvent click...');
+      await editButton.dispatchEvent('click');
+    }
     
-    console.log('Edit button clicked successfully. Waiting for textarea...');
-    await page.waitForTimeout(3000);
+    console.log('Edit button interaction complete. Waiting for textarea...');
+    await page.waitForTimeout(2000);
 
     const descriptionStoring = page.locator('textarea#resumeHeadline');
     await descriptionStoring.waitFor({ state: 'visible', timeout: 20000 });
