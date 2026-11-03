@@ -42,14 +42,16 @@ async function updateNaukriDescription() {
       await page.waitForURL('**/mnjuser/**', { timeout: 120000 });
     }
 
-    console.log('Locating Resume Headline edit button via aria-label...');
+    console.log('Locating Resume Headline edit button...');
     
-    // Target the edit button directly using its explicit aria-label from your HTML snippet
-    const editButton = page.locator('span[aria-label="Edit resume headline"]');
+    // Exact match for your HTML: <span class="edit icon" role="button" tabindex="0" aria-label="Edit resume headline">
+    const editButton = page.locator('span.edit.icon[aria-label="Edit resume headline"]');
     
     await editButton.waitFor({ state: 'visible', timeout: 30000 });
     await editButton.scrollIntoViewIfNeeded();
-    await editButton.click();
+    
+    // Using force: true ensures clicks aren't blocked by transparent overlays or layout quirks in CI
+    await editButton.click({ force: true });
     
     console.log('Edit button clicked successfully. Waiting for textarea...');
     await page.waitForTimeout(3000);
